@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class ChatServer {
 
-    private static AtomicLong counter = new AtomicLong();
+    private static AtomicLong counter = new AtomicLong(1);
     private static Chat chat = new Chat();
 
     public static void main(String[] args) {
@@ -34,11 +34,12 @@ public class ChatServer {
     private static void registerNewUser(Socket socket) {
         try {
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            PrintWriter printWriter = new PrintWriter(socket.getOutputStream());
+            PrintWriter printWriter = new PrintWriter(socket.getOutputStream(), true);
             printWriter.println("SERVER: CONNECTION ESTABLISHED");
             String username = reader.readLine();
-            final long userId = counter.addAndGet(1);
+            final long userId = counter.getAndAdd(1);
             if (username.isBlank()) username = "Agent " + userId;
+            Thread.currentThread().setName(username + "-Thread");
             User user = new User(userId, username, printWriter);
             chat.registerNewUser(user);
 
