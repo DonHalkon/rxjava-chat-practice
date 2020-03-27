@@ -1,58 +1,44 @@
 package model;
 
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.observables.ConnectableObservable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
+
 import java.util.concurrent.*;
 
 public class Chat {
-    private final ConcurrentHashMap<Long, User> users;
     private final BlockingQueue<Message> messages;
+    private final ConnectableObservable<Object> observable;
 
     public Chat() {
-
-        this.users = new ConcurrentHashMap<>();
         this.messages = new ArrayBlockingQueue<>(200);
-
-        new Thread(() -> {
-            Thread.currentThread().setName("Chat-Thread");
-            while (true) {
-                try {
-                    sendMessage(messages.take());
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
+        observable = Observable.create(subscriber -> {
+            while (!subscriber.isDisposed()) {
+                subscriber.onNext(messages.take());
             }
-        }).start();
+        }).subscribeOn(Schedulers.single()).publish();
+        observable.connect();
     }
 
-    private void sendMessage(Message message) {
-        if (message.toAll()) {
-            User sender = message.getFrom();
-            users.forEach((id, user) -> {
-                if (!id.equals(sender.getId())) sendToUser(message.setTo(user));
-            });
-        } else {
-            sendToUser(message);
-        }
+    public void broadcast(Message message) {
+        messages.offer(message);
     }
 
-    private void sendToUser(Message message) {
-        message.getTo().receiveMessage(message);
+    public void registerNewUser(User user, Observable<String> userMessages) {
+        userMessages
+                .doOnComplete(() -> broadcast(new Message("USER '" + user.getUsername() + "' HAS LEFT CHAT")))
+                .subscribe(message -> receiveMessage(user, message), Throwable::printStackTrace);
+
+        broadcast(new Message("WELCOME " + user.getUsername()));
+        broadcast(new Message("NEW USER '" + user.getUsername() + "' JOINED"));
     }
 
-    public void registerNewUser(User user) {
-        users.putIfAbsent(user.getId(), user);
-        messages.offer(new Message("WELCOME " + user.getUsername(), null, user));
-        messages.offer(new Message("NEW USER '" + user.getUsername() + "' JOINED", null, null));
+    private void receiveMessage(User fromUser, String message) {
+        final Message finalMessage = new Message(message, fromUser);
+        broadcast(finalMessage);
     }
 
-    public void removeUser(Long id) {
-        final User user = users.remove(id);
-        messages.offer(new Message("USER '" + user.getUsername() + "' HAS LEFT CHAT", null, null));
-    }
-
-    public void receiveMessage(long fromUserId, String message) {
-        final User from = users.get(fromUserId);
-        final Message finalMessage = new Message(message, from, null);
-        messages.offer(finalMessage);
+    public ConnectableObservable<Object> getObservable() {
+        return observable;
     }
 }

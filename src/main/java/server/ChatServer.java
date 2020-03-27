@@ -1,6 +1,8 @@
 package server;
 
 
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import model.User;
 import model.Chat;
 
@@ -24,7 +26,7 @@ public class ChatServer {
             System.out.println("Server started: localhost:8080");
             while (true) {
                 final Socket socket = serverSocket.accept();
-                new Thread(() -> registerNewUser(socket)).start();
+                registerNewUser(socket);
             }
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -37,15 +39,14 @@ public class ChatServer {
             PrintWriter printWriter = new PrintWriter(socket.getOutputStream(), true);
             printWriter.println("SERVER: CONNECTION ESTABLISHED");
             String username = reader.readLine();
-            final long userId = counter.getAndAdd(1);
-            if (username.isBlank()) username = "Agent " + userId;
-            Thread.currentThread().setName(username + "-Thread");
-            User user = new User(userId, username, printWriter);
-            chat.registerNewUser(user);
+            if (username.isBlank()) username = "Agent_" + counter.getAndAdd(1);
+            User user = new User(username, printWriter, chat);
 
-            reader.lines().forEach(message -> chat.receiveMessage(userId, message));
+            final Observable<String> userMessages = Observable
+                    .fromStream(reader.lines())
+                    .subscribeOn(Schedulers.io());
+            chat.registerNewUser(user, userMessages);
 
-            chat.removeUser(user.getId());
         } catch (IOException e) {
             e.printStackTrace();
             System.out.println("exit: " + Thread.currentThread().getName());
