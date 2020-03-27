@@ -28,22 +28,21 @@ public class Client {
 
     public static void main(String[] args) {
         String username = args.length > 0 ? args[0] : "";
-        try (Socket socket = new Socket("localhost", 8080)) {
+        try (Socket socket = new Socket("localhost", 8080);
+             Scanner userInput = new Scanner(System.in);
+             Scanner serverResponses = new Scanner(socket.getInputStream())) {
 
             PrintWriter printWriter = new PrintWriter(socket.getOutputStream(), true);
             printWriter.println(username);
-            Scanner userInput = new Scanner(System.in);
+
             Observable
                     .fromStream(userInput.tokens())
-                    .observeOn(Schedulers.io())
+                    .subscribeOn(Schedulers.io())
                     .subscribe(printWriter::println, Throwable::printStackTrace);
-            Runtime.getRuntime().addShutdownHook(new Thread(userInput::close));
 
-            try (Scanner serverResponses = new Scanner(socket.getInputStream())) {
-                serverResponses.useDelimiter("\n");
-                Observable.fromStream(serverResponses.tokens()).subscribe(System.out::println);
-//                    serverResponses.tokens().forEach(System.out::println);
-            }
+            serverResponses.useDelimiter("\n");
+            Observable.fromStream(serverResponses.tokens()).subscribe(System.out::println);
+
 
         } catch (IOException e) {
             e.printStackTrace();
