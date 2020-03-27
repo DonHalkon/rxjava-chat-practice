@@ -14,7 +14,7 @@ public class User {
 
     public User(String username, PrintWriter printWriter, Chat chat) {
         this.username = username;
-        chat.getObservable().subscribeOn(Schedulers.io()).subscribe(printWriter::println);
+        chat.getObservable().subscribeOn(Schedulers.computation()).subscribe(printWriter::println);
     }
 
     public String getUsername() {

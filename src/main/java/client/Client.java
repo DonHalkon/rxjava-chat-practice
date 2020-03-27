@@ -11,6 +11,7 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.stream.Stream;
 
 public class Client {
     private static final Random r = new Random();
@@ -35,13 +36,28 @@ public class Client {
             PrintWriter printWriter = new PrintWriter(socket.getOutputStream(), true);
             printWriter.println(username);
 
+
+            //manual messaging
+//            Observable
+//                    .fromStream(userInput.tokens())
+//                    .subscribeOn(Schedulers.io())
+//                    .subscribe(printWriter::println, Throwable::printStackTrace);
             Observable
-                    .fromStream(userInput.tokens())
+                    .fromStream(Stream.generate(() -> {
+                        try {
+                            Thread.sleep(10);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        return messages.get(r.nextInt(length - 1));
+                    }))
                     .subscribeOn(Schedulers.io())
                     .subscribe(printWriter::println, Throwable::printStackTrace);
 
             serverResponses.useDelimiter("\n");
-            Observable.fromStream(serverResponses.tokens()).subscribe(System.out::println);
+//            Observable.fromStream(serverResponses.tokens()).subscribe(System.out::println);
+            //ignore console output
+            Observable.fromStream(serverResponses.tokens()).subscribe(String::isBlank);
 
 
         } catch (IOException e) {
